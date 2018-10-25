@@ -4,14 +4,14 @@ const sigma = 5.67 * Math.pow(10,-8); // Boltzman Constant
 const perihelion = 2; //The day in January of the perihelion, used for distance calculation
 const ast_a = 1.496 * Math.pow(10,8); //Earth's semi-major axis
 const ast_e = .0167; //Earth's eccentricity
-const airTemp = 294.25; // Air temperature at the time of capture
+const airTemp = 71.6; // Air temperature at the time of capture
 const heightGround = .05; //m
 const heightAir = 1.8; //m
-const windSpeed = 3.6; //m/s
+const windSpeed = 4; //m/s
 const heightWindSensor = 1.8; //m
-const plantHeightAvg = 2; //m
+const plantHeightAvg = 1; //m
 const airDensity = 1; //kg/m^2
-const frictionVelocityU = .41*windSpeed/Math.log(heightWindSensor/.12*plantHeightAvg);
+const frictionVelocityU = .41*windSpeed/ln(heightWindSensor/.12*plantHeightAvg);
 const thermalMapping = [299.1,315.1];
 // --- Predeclaration ---
 let tedData;
@@ -73,8 +73,8 @@ Date.prototype.getDOY = function() {
 
 // --- Pre-Initialization Asset Fetching---
 function preload(){
-  nearInfared = loadImage('composite2.jpg'); // Used for NDVI, LAI (uses SAVI with ln()), and SAVI, and for T_s.
-  rgb = loadImage('RGBoutput2.jpg'); // Alpha or Albedo
+  nearInfared = loadImage('Near_Infared.jpg'); // Used for NDVI, LAI (uses SAVI with ln()), and SAVI, and for T_s.
+  rgb = loadImage('rgb.jpg'); // Alpha or Albedo
 }
 
 // --- p5 Initialization ---
@@ -117,23 +117,20 @@ function setup() {
 
   // --- TensorFlow Garbage Collect ---
   tf.tidy(() => {
-    console.log("I haven't even started yet!");
     // --- Create the tensors ---
     redsTensor = tf.squeeze(tf.fromPixels(nirReds,1).toFloat()); // The red values
     nirTensor = tf.squeeze(tf.fromPixels(nirNIR,1).toFloat()); // The NIR Values
     thermalTensor = tf.squeeze(tf.fromPixels(thermalTs,1).toFloat()).div(255).mul(thermalMapping[0]-thermalMapping[1]).add(thermalMapping[1]); // Maps Thermal Values to Kelvin Temperatures
     rgbTensor = tf.squeeze(tf.fromPixels(albedoImg).toFloat()); // A tensor of RGB Values
 
-    console.log("Image tensors bueno!");
     // --- Basic Calculations ---
-    let ndvi = nirTensor.sub(redsTensor).div(nirTensor.add(redsTensor)).mul(255); // Normalized-Difference Vegetation Index
-    let savi = nirTensor.sub(redsTensor).mul(1.1).div(nirTensor.add(redsTensor).add(.1)).mul(255); // Not Sure
+    let ndvi = nirTensor.sub(redsTensor).div(nirTensor.add(redsTensor)).mul(255).toInt(); // Normalized-Difference Vegetation Index
+    let savi = nirTensor.sub(redsTensor).mul(1.1).div(nirTensor.add(redsTensor).add(.1)).mul(255).toInt(); // Not Sure
     let lai = savi.div(255).mul(-1).add(.69).div(.59).log().div(.91); // Not sure
     let emissivity = lai.mul(.01).add(.95); // Surface Emissivity
-    let [rgbRTensor,rgbGTensor,rgbBTensor] = tf.split(rgbTensor,3,2); // Seperate tensors with red-blue-green values
+    let [rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor] = tf.split(rgbTensor,4,2); // Seperate tensors with red-blue-green values
     let Albedo = rgbRTensor.add(rgbGTensor).add(rgbBTensor).div(765); // Albedo or surface reflectance
 
-    console.log("basic calculations good!");
     // --- Constant Definitions and Calculation ---
     const solarDec = tedData.solarDecToTensor(); // Solar Declination
     const solarDist = tedData.solarDistToTensor(); // Distance from sun
@@ -156,14 +153,13 @@ function setup() {
 
     const soilSaturation1 = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
     const soilSaturation2 = tf.exp(hendricksRatioChevron2.sub(1).div(.42)); // Soil Saturation
-    console.log("hard calculations complete!");
-    let rawSoil1 = soilSaturation1.toInt().dataSync();
-    let rawSoil2 = soilSaturation2.toInt().dataSync();
+
+    let rawSoil1 = soilSaturation1.dataSync();
+    let rawSoil2 = soilSaturation2.dataSync();
 
     // --- Create the p5 image ---
     soilImage1 = makeImage(imgW,imgH,rawSoil1);
     soilImage2 = makeImage(imgW,imgH,rawSoil2);
-    console.log("images complete!");
   });
 
   // --- Manual Garbage Collect ---
