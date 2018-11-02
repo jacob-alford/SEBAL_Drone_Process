@@ -64,6 +64,8 @@ function makeImage(w,h,pixArr){
   return tempImage;
 }
 
+const mapTensor = (tensor,oldMin,oldMax,newMin,newMax) => tensor.sub(oldMin).mul(newMax-newMin).div(oldMax-oldMin).add(newMin);
+
 Date.prototype.isLeapYear = function() {
     var year = this.getFullYear();
     if((year & 3) != 0) return false;
@@ -105,8 +107,8 @@ function setup() {
   // --- Assign the respective channel values to the ImageData objects above ---
   for(let c=0;c<nearInfared.pixels.length;c+=4){
     nirReds.data[c] = nearInfared.pixels[c];
-    thermalTs.data[c] = nearInfared.pixels[c+1];
-    nirNIR.data[c] = nearInfared.pixels[c+2];
+    thermalTs.data[c] = nearInfared.pixels[c+2];
+    nirNIR.data[c] = nearInfared.pixels[c+1];
     nirReds.data[c+1] = 0;
     nirReds.data[c+2] = 0
     nirReds.data[c+3] = 0;
@@ -140,6 +142,7 @@ function setup() {
     /*-Keep-*/ let ndvi = nirTensor.sub(redsTensor).div(nirTensor.add(redsTensor)); // Normalized-Difference Vegetation Index
     /*-Destroy-*/ let savi = nirTensor.sub(redsTensor).mul(1.1).div(nirTensor.add(redsTensor).add(.1)); // Soil Adjusted Vegitation Index
     /*-Destroy-*/ let lai = savi.mul(-1).add(.69).div(.59).log().div(.91); // Leaf area index
+                  //console.log(lai.dataSync()[2365+imgW*1036]);
     /*-Destroy-*/ let emissivity = lai.mul(.01).add(.95); // Surface Emissivity
     /*-Destroy-*/ let [rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor] = tf.split(rgbTensor,3,2); // Seperate tensors with red-blue-green values
     /*-Destroy-*/ let albedo = tf.squeeze(rgbRTensor.add(rgbGTensor).add(rgbBTensor).div(765)); // albedo or surface reflectance
@@ -183,35 +186,35 @@ function setup() {
     tf.dispose(hendricksRatioChevron1);
 
     // --- Create the p5 image ---
-    let RawNIR = nirTensor.mul(255).toInt().dataSync();
-    let RawThermal = thermalTensor.mul(255).toInt().dataSync();
-    let RawNDVI = ndvi.mul(255).toInt().dataSync();
-    let RawRn = netRadiationRn.mul(255).toInt().dataSync();
-    let RawSoilFlux = soilMoistureFluxG.mul(255).toInt().dataSync();
+    //let RawNIR = ndvi.mul(255).toInt().dataSync();
+    //let RawThermal = thermalTensor.mul(255).toInt().dataSync();
+    //let RawNDVI = ndvi.mul(255).toInt().dataSync();
+    //let RawRn = netRadiationRn.mul(255).toInt().dataSync();
+    //let RawSoilFlux = soilMoistureFluxG.mul(255).toInt().dataSync();
     let RawSoil1 = soilSaturation1.mul(255).toInt().dataSync();
 
-    tf.dispose([nirTensor,thermalTensor,ndvi,soilSaturation1,netRadiationRn,soilMoistureFluxG]);
+    //tf.dispose([nirTensor,thermalTensor,ndvi,soilSaturation1,netRadiationRn,soilMoistureFluxG]);
 
-    nirImage = makeImage(imgW,imgH,RawNIR).save('nir.jpg');
-    ndviImage = makeImage(imgW,imgH,RawNDVI).save('ndvi.jpg');
-    rnImage = makeImage(imgW,imgH,RawRn).save('netRadiation.jpg');
-    soilFluxImage = makeImage(imgW,imgH,RawSoilFlux).save('soilFlux.jpg');
-    soilImage = makeImage(imgW,imgH,RawSoil1).save('soilSat.jpg');
+    //nirImage = makeImage(imgW,imgH,RawNIR);
+    //ndviImage = makeImage(imgW,imgH,RawNDVI).save('ndvi.jpg');
+    //rnImage = makeImage(imgW,imgH,RawRn).save('netRadiation.jpg');
+    //soilFluxImage = makeImage(imgW,imgH,RawSoilFlux).save('soilFlux.jpg');
+    soilImage = makeImage(imgW,imgH,RawSoil1);
 
 
-    RawNIR = null;
-    RawNDVI = null;
-    RawRn = null;
-    RawSoilFlux = null;
-    RawSoil1 = null;
-    nirImage = null;
-    ndviImage = null;
-    nirReds = null;
-    nirNIR = null;
-    thermalTs = null;
-    albedoImg = null;
+    //RawNIR = null;
+    //RawNDVI = null;
+    //RawRn = null;
+    //RawSoilFlux = null;
+    //RawSoil1 = null;
+    //nirImage = null;
+    //ndviImage = null;
+    //nirReds = null;
+    //nirNIR = null;
+    //thermalTs = null;
+    //albedoImg = null;
 
-    /*-Disp-*/ console.log("Images Calculated and Saved Successfully!");
+    /*-Disp-*/ //console.log("Images Calculated and Saved Successfully!");
   });
 }
 
@@ -219,6 +222,6 @@ function setup() {
 function draw() {
   frameRate(1);
   clear();
-  if(frameCount%2 == 0) image(soilImage,0,0,500,636);
-  else image(rgb,0,0,500,636);
+  if(frameCount%2 == 0) image(rgb,0,0,500,636);
+  else image(soilImage,0,0,500,636);
 }
