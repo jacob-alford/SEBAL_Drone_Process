@@ -11,7 +11,7 @@ const windSpeed = 3.6; //m/s
 const heightWindSensor = 1.8; //m
 const plantHeightAvg = 2; //m
 const airDensity = 1; //kg/m^2
-const zenithAngle = .0311;
+const zenithAngle = .4337;
 const frictionVelocityU = .41*windSpeed/Math.log(heightWindSensor/.12*plantHeightAvg);
 const thermalMapping = [299.1,315.1];
 // --- Predeclaration ---
@@ -29,15 +29,26 @@ let ndviImage;
 let soilImage;
 let rnImage;
 let soilFluxImage;
+
+let tempNirNir;
+let tempThermal;
+let tempNirReds;
+
+let ndvi;
+let savi;
+let lai;
+
 // --- Class Definition and Supporting Functions
 class GeoData{
   constructor(date){
     let doy = date.getDOY();
+    console.log(doy);
     this.solarDeclination = -1 * Math.asin(.39779 * Math.cos(.98565 * (doy + 10) + 1.914 * Math.sin(.98565 * (doy - 2))));
     this.solarDistance = (ast_a * (1-Math.pow(ast_e,2)))/(1+(ast_e * Math.cos((365.25/360) * (doy-perihelion))))/(1.496*Math.pow(10,11));
-    this.solarConductivity = .75 + 2*Math.pow(10,-5)*1511;
+    this.atmTrans = .75 + 2*Math.pow(10,-5)*1511;
     this.solarIncidence = zenithAngle;
     this.temperature = airTemp;
+    this.atmosEmiss = .85 * Math.pow(-1 * Math.log(this.atmTrans),.09);
   }
   solarIncToTensor(){
     return tf.scalar(this.solarInclination);
@@ -45,11 +56,14 @@ class GeoData{
   solarDistToTensor(){
     return tf.scalar(this.solarDistance);
   }
-  solarCondToTensor(){
-    return tf.scalar(this.solarConductivity);
+  solarAtmTransToTensor(){
+    return tf.scalar(this.atmTrans);
   }
   solarIncToTensor(){
     return tf.scalar(this.solarIncidence);
+  }
+  atmosEmissToTensor(){
+    return tf.scalar(this.atmosEmiss);
   }
 }
 
@@ -95,117 +109,154 @@ function setup() {
   imgH = nearInfared.height;
   createCanvas(500,636);
 
-  // --- Instanciate the ECMAScript ImageData Class for Tensorflow ---
-  let nirReds = new ImageData(nearInfared.width,nearInfared.height); // Use in NDVI/SAVI
-  let nirNIR = new ImageData(nearInfared.width,nearInfared.height); // Use in NDVI/SAVI
-  let thermalTs = new ImageData(nearInfared.width,nearInfared.height); // Used for T_s
-  let albedoImg = new ImageData(nearInfared.width,nearInfared.height); // Used for albedo from RGB.
+
 
   // --- Get all the necessary images and their respective matricies ---
+  tempNirReds = [];
+  tempThermal = [];
+  tempNirNir = [];
+
   nearInfared.loadPixels();
-
   // --- Assign the respective channel values to the ImageData objects above ---
-  for(let c=0;c<nearInfared.pixels.length;c+=4){
-    nirReds.data[c] = nearInfared.pixels[c];
-    thermalTs.data[c] = nearInfared.pixels[c+2];
-    nirNIR.data[c] = nearInfared.pixels[c+1];
-    nirReds.data[c+1] = 0;
-    nirReds.data[c+2] = 0
-    nirReds.data[c+3] = 0;
-    nirNIR.data[c+1] = 0;
-    nirNIR.data[c+2] = 0
-    nirNIR.data[c+3] = 0;
-    thermalTs.data[c+1] = 0;
-    thermalTs.data[c+2] = 0;
-    thermalTs.data[c+3] = 0;
-  }
+  nearInfared.pixels.forEach((c,i) => {
+    if(i%4 == 0) tempNirReds[i/4] = c; // The red pixels go to the red temporary array
+    else if(i%4 == 1) tempNirNir[(i-1)/4] = c; // The greens (or near infared band) go to nir temporary array
+    else if(i%4 == 2) tempThermal[(i-2)/4] = c; // The blues (or thermal band) go to thermal array
+  });
 
+  let tempAlbedo = [];
   // --- Assign albedo Pixels ---
   rgb.loadPixels();
-  albedoImg.data = rgb.pixels;
+  rgb.pixels.forEach((c,i) => {
+    tempAlbedo[i] = c;
+  });
 
   // --- TensorFlow Garbage Collect ---
   tf.tidy(() => {
-    console.log("Starting Process.");
+    console.log("Hello.");
     // --- Create the tensors ---
-    /*-Destroy-*/ let redsTensor = tf.squeeze(tf.fromPixels(nirReds,1).toFloat().div(255)); // The red values
-    /*-Keep-*/ let nirTensor = tf.squeeze(tf.fromPixels(nirNIR,1).toFloat().div(255)); // The NIR Values
-    /*-Keep-*/ let thermalTensor = tf.squeeze(tf.fromPixels(thermalTs,1).toFloat()).div(255).mul(thermalMapping[0]-thermalMapping[1]).add(thermalMapping[1]); // Maps Thermal Values to Kelvin Temperatures
-    /*-Destroy-*/ let rgbTensor = tf.squeeze(tf.fromPixels(albedoImg).toFloat()); // A tensor of RGB Values
 
-    nirReds = null;
-    nirNIR = null;
-    albedoImg = null;
+     let redsTensor = tf.tensor(tempNirReds,[imgW,imgH]); // The red values
+     let nirTensor = tf.tensor(tempNirNir,[imgW,imgH]); // The NIR Values
+     let rgbTensor = tf.tensor(tempAlbedo,[imgW,imgH,4]); // A tensor of RGB Values
 
-    /*-Disp-*/ console.log("Images Succesfully Converted to Matricies.");
-    // --- Basic Calculations ---
-    /*-Keep-*/ let ndvi = nirTensor.sub(redsTensor).div(nirTensor.add(redsTensor)); // Normalized-Difference Vegetation Index
-    /*-Destroy-*/ let savi = nirTensor.sub(redsTensor).mul(1.1).div(nirTensor.add(redsTensor).add(.1)); // Soil Adjusted Vegitation Index
-    /*-Destroy-*/ let lai = savi.mul(-1).add(.69).div(.59).log().div(.91); // Leaf area index
-                  //console.log(lai.dataSync()[2365+imgW*1036]);
-    /*-Destroy-*/ let emissivity = lai.mul(.01).add(.95); // Surface Emissivity
-    /*-Destroy-*/ let [rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor] = tf.split(rgbTensor,3,2); // Seperate tensors with red-blue-green values
-    /*-Destroy-*/ let albedo = tf.squeeze(rgbRTensor.add(rgbGTensor).add(rgbBTensor).div(765)); // albedo or surface reflectance
+    tempNirReds = null;
+    tempNirNir = null;
+    tempAlbedo = null;
 
-    tf.dispose([redsTensor,rgbTensor,rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor,savi,lai]);
+     ndvi = nirTensor.sub(redsTensor).div(nirTensor.add(redsTensor)); // Normalized-Difference Vegetation Index
+     savi = nirTensor.sub(redsTensor).mul(1.1).div(nirTensor.add(redsTensor).add(.1)); // Soil Adjusted Vegitation Index
+     lai = savi.mul(-1).add(.69).div(.59).log().div(.91).mul(-1); // Leaf area index
 
-    /*-Disp-*/ console.log("Acquired: NDVI, SAVI, LAI, Emissivity, and Albedo.\nNow working on Net Radiation (Rn), and Soil Moisture Flux (G).");
+     console.log("--Sample NDVI (from grass):");
+     console.log(ndvi.dataSync()[2136+919*imgW]);
+     console.log("--Sample SAVI (from grass):");
+     console.log(savi.dataSync()[2136+919*imgW]);
+     console.log("--Sample LAI (from grass):");
+     console.log(lai.dataSync()[2165+919*imgW]);
 
-    // --- Constant Definitions and Calculation ---
-    /*-Scalar-*/ const solarInc = tedData.solarIncToTensor(); // Solar Incidence
-    /*-Scalar-*/ const solarDist = tedData.solarDistToTensor(); // Distance from sun
-    /*-Scalar-*/ const solarCond = tedData.solarCondToTensor(); // Solar Conductivity
-    /*-Disp-*/ console.log(`--Solar Incidence: ${solarInc.toString()}\n--Solar Distance:\n ${solarDist.toString()}\n--Solar Conductivity: ${solarCond.toString()}`);
+      let tempLai = lai.dataSync();
+      let tempEmiss = [];
+      tempLai.forEach(c => {
+        tempEmiss.push((c<3)?c*.01+.95:.98);
+      });
+     let emissivity = tf.tensor(tempEmiss,[imgW,imgH]); // Surface Emissivity
+     console.log("--Sample Emissivity (from grass):");
+     console.log(emissivity.dataSync()[2165+919*imgW]);
+      tempEmiss = null;
+      tempLai = null;
 
-    /*-Scalar-*/ const incomingShortwave = solarDist.reciprocal().pow(tf.scalar(2)).mul(solarInc.cos()).mul(1367).mul(solarCond); // Incoming shortwave radiation
-    /*-Scalar-*/ const incomingLongwave = tf.scalar(Math.pow(tedData.temperature,4)*5.6*Math.pow(10,-8)); // Incoming longwave radiation
-    /*-Disp-*/ console.log(`--Incoming Shortwave: ${incomingShortwave.toString()}\n--Incoming Longwave:\n ${incomingLongwave.toString()}`);
+    let thermalTensor = mapTensor(tf.tensor(tempThermal,[imgW,imgH]),0,255,thermalMapping[0],thermalMapping[1]).pow(4).sub(emissivity.mul(-1).add(1).mul(Math.pow(tedData.temperature,4))).div(emissivity).pow(.25); // Maps Thermal Values to Kelvin Temperatures
+    console.log("--Sample Thermal Measurements (from grass):");
+    console.log(thermalTensor.dataSync()[2165+919*imgW]);
 
-    /*-Destroy-*/ const outgoingLongwave = thermalTensor.pow(tf.scalar(4)).mul(tf.scalar(5.6*Math.pow(10,-8))).mul(emissivity); // Outgoing longwave radiation
-    /*-Keep-*/ const netRadiationRn = incomingShortwave.sub(albedo.mul(incomingShortwave)).add(outgoingLongwave).add(emissivity.mul(incomingLongwave)); // Rn or net radiation
-    /*-Keep-*/ const soilMoistureFluxG = thermalTensor.div(ndvi.pow(tf.scalar(4)).mul(albedo.pow(tf.scalar(3))).mul(-.007252).add(albedo.pow(tf.scalar(3)).mul(.0074)).sub(ndvi.pow(tf.scalar(4)).mul(albedo.pow(tf.scalar(2))).mul(.003724)).add(albedo.pow(tf.scalar(2)).mul(.0038))).mul(netRadiationRn); // Soil Moisture Flux
+    tempThermal = null;
+
+    const solarInc = tedData.solarIncToTensor(); // Solar Incidence
+    console.log("--Solar Incidence:");
+    solarInc.print();
+
+    const solarDist = tedData.solarDistToTensor(); // Distance from sun
+    console.log("--Solar Distance:");
+    solarDist.print();
+
+    const atmTransTens = tedData.solarAtmTransToTensor(); // Atmosphereic Transmisivity
+    console.log("--Atmospheric Transmisivity:");
+    atmTransTens.print();
+
+    const incomingShortwave = solarDist.reciprocal().pow(2).mul(solarInc.cos()).mul(1367).mul(atmTransTens); // Incoming shortwave radiation
+    console.log("--Incoming Shortwave Radiation:");
+    incomingShortwave.print();
+
+    const incomingLongwave = tf.scalar(Math.pow(tedData.temperature,4)*5.6*Math.pow(10,-8)).mul(tedData.atmosEmissToTensor()); // Incoming longwave radiation
+    console.log("--Incoming Longwave Radiation:");
+    incomingLongwave.print();
+
+     let [rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor] = tf.split(rgbTensor,4,2); // Seperate tensors with red-blue-green values
+     let reds = tf.squeeze(rgbRTensor);
+      let greens = tf.squeeze(rgbGTensor);
+      let blues = tf.squeeze(rgbBTensor);
+      let albedo = tf.squeeze(reds.add(greens).add(blues).div(incomingShortwave)); // albedo or surface reflectance
+      console.log("--Albedo:");
+      console.log(albedo.dataSync()[2165+919*imgW]);
+    tf.dispose([redsTensor,rgbTensor,rgbRTensor,rgbGTensor,rgbBTensor,rgbATensor,reds,greens,blues]);
+
+     const outgoingLongwave = thermalTensor.pow(tf.scalar(4)).mul(tf.scalar(5.67*Math.pow(10,-8))).mul(emissivity); // Outgoing longwave radiation
+     console.log("--Outgoing Longwave Radiation:");
+     console.log(outgoingLongwave.dataSync()[2165+919*imgW]);
+
+     const netRadiationRn = incomingShortwave.sub(albedo.mul(incomingShortwave)).sub(outgoingLongwave).add(emissivity.mul(incomingLongwave)); // Rn or net radiation
+     console.log("--Net Radiation (Rn):");
+     console.log(netRadiationRn.dataSync()[2165+919*imgW]);
+
+     //const soilMoistureFluxG = thermalTensor.mul(-50).div(ndvi.mul(49).sub(50)).div(albedo.pow(2)).div(albedo.mul(.0074).add(.0038)).mul(netRadiationRn); // Soil Moisture Flux
+     const soilMoistureFluxG = thermalTensor.sub(273.15).mul(albedo.mul(.0074).add(.0038)).mul(ndvi.pow(4).mul(-.98).add(1)).mul(netRadiationRn); // Soil Moisture Flux
+     console.log("--Soil Moisture Flux (G):");
+     console.log(soilMoistureFluxG.dataSync()[2165+919*imgW]);
 
     tf.dispose([emissivity,albedo,outgoingLongwave]);
 
-    /*-Disp-*/ console.log("Acquired: Net Radiation (Rn), and Soil Moisture Flux (G).\nNow working on Ground Roughness (Rah), Sensible Heat Flux (H), and Latent Heat Flux (&#x3BB;).");
+    //const groundRoughnessRah = tf.scalar(heightGround/heightAir).log().div(frictionVelocityU).mul(.41); // Ground Roughness
 
-    /*-Scalar-*/ const groundRoughnessRah = tf.scalar(heightGround/heightAir).log().div(frictionVelocityU).mul(.41); // Ground Roughness
-    /*-Disp-*/ console.log(`--Ground Roughness: ${groundRoughnessRah.toString()}`);
+     //const sensibleHeatFluxH = thermalTensor.mul(-1).add(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
+     //const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
 
-    /*-Destroy-*/ const sensibleHeatFluxH = thermalTensor.mul(-1).add(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
-    /*-Destroy-*/ const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
+     //console.log("Acquired: Ground Roughness (Rah), Sensible Heat Flux (H), and Latent Heat Flux (&#x3BB;).\nNow working on Hendrick's Ratio (v1, &#94;), and Soil Saturation.");
 
-    /*-Disp-*/ console.log("Acquired: Ground Roughness (Rah), Sensible Heat Flux (H), and Latent Heat Flux (&#x3BB;).\nNow working on Hendrick's Ratio (v1, &#94;), and Soil Saturation.");
+     //const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH)); // Whatever chevron is
 
-    /*-Destroy-*/ const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH)); // Whatever chevron is
+    //tf.dispose([sensibleHeatFluxH,latentHeatFluxLambda]);
 
-    tf.dispose([sensibleHeatFluxH,latentHeatFluxLambda]);
+     //const soilSaturation1 = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
 
-    /*-Keep-*/ const soilSaturation1 = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
-
-    tf.dispose(hendricksRatioChevron1);
+    //tf.dispose(hendricksRatioChevron1);
 
     // --- Create the p5 image ---
     //let RawNIR = ndvi.mul(255).toInt().dataSync();
     //let RawThermal = thermalTensor.mul(255).toInt().dataSync();
-    //let RawNDVI = ndvi.mul(255).toInt().dataSync();
-    //let RawRn = netRadiationRn.mul(255).toInt().dataSync();
-    //let RawSoilFlux = soilMoistureFluxG.mul(255).toInt().dataSync();
-    let RawSoil1 = soilSaturation1.mul(255).toInt().dataSync();
+    //let RawLAI = lai.mul(255).toInt().dataSync();
+    //let RawEmiss = emissivity.mul(255).toInt().dataSync();
+    let RawRn = mapTensor(netRadiationRn,500,700,0,255).toInt().dataSync();
+    let RawSoilFlux = mapTensor(soilMoistureFluxG,50,175,0,255).toInt().dataSync();
+    //let RawSoil1 = soilSaturation1.mul(255).toInt().dataSync();
 
     //tf.dispose([nirTensor,thermalTensor,ndvi,soilSaturation1,netRadiationRn,soilMoistureFluxG]);
 
     //nirImage = makeImage(imgW,imgH,RawNIR);
-    //ndviImage = makeImage(imgW,imgH,RawNDVI).save('ndvi.jpg');
-    //rnImage = makeImage(imgW,imgH,RawRn).save('netRadiation.jpg');
-    //soilFluxImage = makeImage(imgW,imgH,RawSoilFlux).save('soilFlux.jpg');
-    soilImage = makeImage(imgW,imgH,RawSoil1);
+    //laiImage = makeImage(imgW,imgH,RawLAI);
+    //emissImage = makeImage(imgW,imgH,RawEmiss);
+    rnImage = makeImage(imgW,imgH,RawRn);
+    rnImage.save("RnImage.jpg");
+
+    soilFluxImage = makeImage(imgW,imgH,RawSoilFlux);
+    soilFluxImage.save("SoilFlux.jpg");
+    //soilImage = makeImage(imgW,imgH,RawSoil1);
 
 
     //RawNIR = null;
     //RawNDVI = null;
-    //RawRn = null;
-    //RawSoilFlux = null;
+    RawRn = null;
+    RawSoilFlux = null;
     //RawSoil1 = null;
     //nirImage = null;
     //ndviImage = null;
@@ -214,7 +265,7 @@ function setup() {
     //thermalTs = null;
     //albedoImg = null;
 
-    /*-Disp-*/ //console.log("Images Calculated and Saved Successfully!");
+     //console.log("Images Calculated and Saved Successfully!");
   });
 }
 
@@ -222,6 +273,6 @@ function setup() {
 function draw() {
   frameRate(1);
   clear();
-  if(frameCount%2 == 0) image(rgb,0,0,500,636);
-  else image(soilImage,0,0,500,636);
+  if(frameCount%2 == 0) image(soilFluxImage,0,0,500,636);
+  else image(rnImage,0,0,500,636);
 }
