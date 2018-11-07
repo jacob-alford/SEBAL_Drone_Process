@@ -5,14 +5,14 @@ const perihelion = 2; //The day in January of the perihelion, used for distance 
 const ast_a = 1.496 * Math.pow(10,11); //Earth's semi-major axis
 const ast_e = .0167; //Earth's eccentricity
 const airTemp = 294.25; // Air temperature at the time of capture
-const heightGround = .05; //m
+const heightGround = .1; //m
 const heightAir = 1.8; //m
 const windSpeed = 3.6; //m/s
-const heightWindSensor = 1.8; //m
+const heightWindSensor = 2; //m
 const plantHeightAvg = 2; //m
 const airDensity = 1; //kg/m^2
 const zenithAngle = .4337;
-const frictionVelocityU = .41*windSpeed/Math.log(heightWindSensor/.12*plantHeightAvg);
+let frictionVelocityU = .41*windSpeed/Math.log(heightWindSensor/.12*plantHeightAvg);
 const thermalMapping = [299.1,315.1];
 // --- Predeclaration ---
 let tedData;
@@ -29,6 +29,13 @@ let ndviImage;
 let soilImage;
 let rnImage;
 let soilFluxImage;
+let frictionVelocityU200;
+let groundRoughnessRah;
+let sensibleHeatFluxH;
+let moninObukhovLengthL;
+let psiHg;
+let psiHs;
+let psiM;
 
 let tempNirNir;
 let tempThermal;
@@ -209,16 +216,51 @@ function setup() {
      console.log("--Net Radiation (Rn):");
      console.log(netRadiationRn.dataSync()[2165+919*imgW]);
 
-     //const soilMoistureFluxG = thermalTensor.mul(-50).div(ndvi.mul(49).sub(50)).div(albedo.pow(2)).div(albedo.mul(.0074).add(.0038)).mul(netRadiationRn); // Soil Moisture Flux
      const soilMoistureFluxG = thermalTensor.sub(273.15).mul(albedo.mul(.0074).add(.0038)).mul(ndvi.pow(4).mul(-.98).add(1)).mul(netRadiationRn); // Soil Moisture Flux
      console.log("--Soil Moisture Flux (G):");
      console.log(soilMoistureFluxG.dataSync()[2165+919*imgW]);
 
     tf.dispose([emissivity,albedo,outgoingLongwave]);
 
-    //const groundRoughnessRah = tf.scalar(heightGround/heightAir).log().div(frictionVelocityU).mul(.41); // Ground Roughness
+    psiHg = tf.variable(tf.ones([imgW,imgH]));
+    psiHs = tf.variable(tf.ones([imgW,imgH]));
+    psiM = tf.variable(tf.ones([imgW,imgH]));
 
-     //const sensibleHeatFluxH = thermalTensor.mul(-1).add(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
+    frictionVelocityU200 = frictionVelocityU*(Math.log(200/heightGround)/.41);
+
+    frictionVelocityU = (.41*frictionVelocityU200)/(Math.log(200/heightGround));
+
+    groundRoughnessRah = tf.tensor((Math.log(heightGround/heightAir) - psiH.dataSync()[1] + psiH.dataSync()[0])/(frictionVelocityU * .41),[imgW,imgH]); // Ground Roughness
+
+    for(let c=0;c<9;c++){
+       sensibleHeatFluxH = thermalTensor.mul(-1).add(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
+       moninObukhovLengthL = thermalTensor.mul(Math.pow(frictionVelocityU,3)).mul(1004).div(sensibleHeatFluxH.mul(.41*9.81));
+       if(moninObukhovLengthL.min() > 0){
+         psiM.assign(moninObukhovLengthL.reciprocal().mul(-10));
+         psiHs.assign(moninObukhovLengthL.reciprocal().mul(-10));
+         psiHg.assign(moninObukhovLengthL.reciprocal().mul(-.5));
+       }else if(moninObukhovLengthL.max() < 0){
+         psiM.assign(moninObukhovLengthL.reciprocal().mul(-3200).add(1).pow(.25).add(1).div(2).log().mul(2).add(moninObukhovLengthL.reciprocal().mul(-3200).add(1).pow(.5).add(1).div(2).log()).add(moninObukhovLengthL.reciprocal().mul(-3200).add(1).pow(.25).atan().mul(-2)).add(.5 * Math.PI));
+         psiHs.assign(moninObukhovLengthL.reciprocal().mul(-32).add(1).pow(.5).add(1).div(2).log().mul(2));
+         psiHg.assign(moninObukhovLengthL.reciprocal().mul(-1.6).add(1).pow(.5).add(1).div(2).log().mul(2));
+       }else if(moninObukhovLengthL.sum() == 0){
+         psiM.assign(tf.zeros([imgW,imgH]));
+         psiHs.assign(tf.zeros([imgW,imgH]));
+         psiHg.assign(tf.zeros([imgW,imgH]));
+       }else{
+        let tempLValues = moninObukhovLengthL.dataSync();
+        let output = [];
+        tempLValues.forEach(v => {
+          if(v>0){
+            
+          }else if(v<0){
+
+          }else{
+
+          }
+        });
+       }
+    }
      //const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
 
      //console.log("Acquired: Ground Roughness (Rah), Sensible Heat Flux (H), and Latent Heat Flux (&#x3BB;).\nNow working on Hendrick's Ratio (v1, &#94;), and Soil Saturation.");
