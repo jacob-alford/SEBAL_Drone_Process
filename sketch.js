@@ -6,13 +6,12 @@ const ast_a = 1.496 * Math.pow(10,11); //Earth's semi-major axis
 const ast_e = .0167; //Earth's eccentricity
 const airTemp = 294.25; // Air temperature at the time of capture
 const heightGround = .1; //m
-const heightAir = 1.8; //m
+const heightAir = 200; //m
 const windSpeed = 3.6; //m/s
 const heightWindSensor = 2; //m
 const plantHeightAvg = 2; //m
-const airDensity = 1; //kg/m^2
+const airDensity = .08163; //kg/m^3
 const zenithAngle = .4337;
-let frictionVelocityU = .41*windSpeed/Math.log(heightWindSensor/.12*plantHeightAvg);
 const thermalMapping = [299.1,315.1];
 const imageDimensions = [3539,4165];
 
@@ -23,9 +22,11 @@ let netRadiationImageFilename = 'RnImage.jpg';
 let soilFluxImageFilename = 'SoilFlux.jpg';
 let thermalImageFilename = 'thermalImg.jpg';
 let sensHeatFluxFilename = 'sensHeatFlux.jpg';
+let soilSaturationFilename = 'soilSat.jpg';
 
 // ---------- Predeclaration ----------
 let tedData;
+let frictionVelocityU;
 let imageArray = [];
 let imgW;
 let imgH;
@@ -58,6 +59,7 @@ let frictionVelocityU200;
 let groundRoughnessRah;
 let sensibleHeatFluxH;
 let moninObukhovLengthL;
+let soilSaturationImage;
 let psiHg;
 let psiHs;
 let psiM;
@@ -156,7 +158,7 @@ function preload(){
   netRadiationImageRn = loadImage(netRadiationImageFilename, () => appendImageArr(2,"Net Radiation Image",true), () => appendImageArr(2,"Net Radiation Image",false,false));
   soilFluxImageG = loadImage(soilFluxImageFilename, () => appendImageArr(3,"Soil Flux Image",true), () => appendImageArr(3,"Soil Flux Image",false,false));
   thermalImageImp = loadImage(thermalImageFilename, () => appendImageArr(4,"Thermal Image",true), () => appendImageArr(4,"Thermal Image",false,false));
-  //sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
+  sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
 }
 
 // --- p5 Initialization ---
@@ -316,17 +318,37 @@ function setup() {
     psiHs = tf.variable(tf.ones([imgW,imgH]));
     psiM = tf.variable(tf.ones([imgW,imgH]));
 
-    frictionVelocityU200 = frictionVelocityU*(Math.log(200/heightGround)/.41);
+    frictionVelocityU = tf.variable(tf.fill([imgW,imgH],(.41*windSpeed)/(Math.log(heightWindSensor/(.12*plantHeightAvg)))));
+    console.log("--Initial Friction Velocity U*:");
+    console.log(frictionVelocityU.dataSync()[2165+919*imgW]);
 
-    frictionVelocityU = (.41*frictionVelocityU200)/(Math.log(200/heightGround));
+    frictionVelocityU200 = frictionVelocityU.mul(Math.log(heightAir/(.12*plantHeightAvg))/.41);
+    console.log("--Initial Friction Velocity U200:");
+    console.log(frictionVelocityU200.dataSync()[2165+919*imgW]);
 
-    groundRoughnessRah = tf.tensor((Math.log(heightGround/heightAir) - psiH.dataSync()[1] + psiH.dataSync()[0])/(frictionVelocityU * .41),[imgW,imgH]); // Ground Roughness
+    frictionVelocityU.assign(frictionVelocityU200.mul(.41).div(Math.log(heightAir/(.12*plantHeightAvg))));
+    console.log("--Second Friction Velocity U*:");
+    console.log(frictionVelocityU.dataSync()[2165+919*imgW]);
 
-    for(let c=0;c<9;c++){
-       sensibleHeatFluxH = thermalTensor.mul(-1).add(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
-       moninObukhovLengthL = thermalTensor.mul(Math.pow(frictionVelocityU,3)).mul(1004).div(sensibleHeatFluxH.mul(.41*9.81));
+    groundRoughnessRah = tf.variable(frictionVelocityU.mul(.41).reciprocal().mul(Math.log(heightWindSensor/heightGround))); // Ground Roughness
+    console.log("--Initial Ground Roughness Rah:");
+    console.log(groundRoughnessRah.dataSync()[2165+919*imgW]);
+
+    console.log("Starting loop...");
+
+    for(let c=0;c<2;c++){
+      console.log(`Pass number: ${c}`);
+
+       sensibleHeatFluxH = thermalTensor.sub(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
+       console.log("--Current sensible Heat Flux Sample Grass Value:");
+       console.log(sensibleHeatFluxH.dataSync()[2165+919*imgW]);
+
+       moninObukhovLengthL = thermalTensor.mul(frictionVelocityU.pow(3)).mul(-1004).div(sensibleHeatFluxH.mul(.41*9.81));
+       console.log("--Current Monin Obukhov Length:");
+       console.log(moninObukhovLengthL.dataSync()[2165+919*imgW]);
+
        if(moninObukhovLengthL.min() > 0){
-         psiM.assign(moninObukhovLengthL.reciprocal().mul(-10));
+         psiM.assign(moninObukhovLengthL.reciprocal().mul(-10)); // Stability Corrections - M: Momentum, H: heat (height s, sensor; g, ground).
          psiHs.assign(moninObukhovLengthL.reciprocal().mul(-10));
          psiHg.assign(moninObukhovLengthL.reciprocal().mul(-.5));
        }else if(moninObukhovLengthL.max() < 0){
@@ -339,23 +361,48 @@ function setup() {
          psiHg.assign(tf.zeros([imgW,imgH]));
        }else{
         let tempLValues = moninObukhovLengthL.dataSync();
-        let output = [];
+        let tempPsiM = [];
+        let tempPsiHs = [];
+        let tempPsiHg = [];
         tempLValues.forEach(v => {
           if(v>0){
-
+            tempPsiM.push(-10/v);
+            tempPsiHs.push(-10/v);
+            tempPsiHg.push(-.5/v);
           }else if(v<0){
-
+            tempPsiM.push(2 * Math.log((1+Math.pow(1-3200/v,.25))/2) + Math.log((1+Math.pow(1-3200/v,.5))/2) - 2*Math.atan(Math.pow(1-3200/v,.25)) + .5 * Math.PI);
+            tempPsiHs.push(2*Math.log((1+Math.pow(1-32/v,.5))/2));
+            tempPsiHg.push(2*Math.log((1+Math.pow(1-1.6/v,.5))/2));
           }else{
-
+            tempPsiM.push(0);
+            tempPsiHg.push(0);
+            tempPsiHs.push(0);
           }
         });
+        tempLValues = null;
+        psiHg.assign(tf.tensor(tempPsiHg,[imgW,imgH]));
+        psiHs.assign(tf.tensor(tempPsiHs,[imgW,imgH]));
+        psiM.assign(tf.tensor(tempPsiM,[imgW,imgH]));
+        tempPsiM = null;
+        tempPsiHg = null;
+        tempPsiHs = null;
        }
+       frictionVelocityU.assign(frictionVelocityU200.mul(.41).div(psiM.mul(-1).add(Math.log(heightAir/heightGround))));
+       console.log("--Updated Friction Velocity U*:");
+       console.log(frictionVelocityU.dataSync()[2165+919*imgW]);
+
+       groundRoughnessRah.assign(psiHs.mul(-1).add(psiHg).add(Math.log(heightWindSensor/heightGround)).div(frictionVelocityU.mul(.41)));
+       console.log("--Ground Roughness Rah:");
+       console.log(groundRoughnessRah.dataSync()[2165+919*imgW]);
     }
   // ------------------
-
+  // --- Analyze Results ---
+  console.log("--Sensible Heat Flux Sample Grass Value:");
+  console.log(sensibleHeatFluxH.dataSync()[2165+919*imgW]);
+  // ------------------
   // --- Outputs ---
-    let RawSensibleHeatFlux = mapTensor(sensibleHeatFluxH, 0 , 1 ,0,255).toInt().dataSync();
-    tf.dipose([thermalTensor,sensibleHeatFluxH,moninObukhovLengthL,psiHs,psiM,psiHg]);
+    let RawSensibleHeatFlux = mapTensor(sensibleHeatFluxH,0,500,0,255).toInt().dataSync();
+    tf.dispose([thermalTensor,sensibleHeatFluxH,moninObukhovLengthL,psiHs,psiM,psiHg]);
 
     sensHeatFlux = makeImage(imgW,imgH,RawSensibleHeatFlux);
     addImages([sensHeatFlux]);
@@ -368,80 +415,57 @@ function setup() {
     let RawRn = [];
     netRadiationImageRn.loadPixels();
     netRadiationImageRn.pixels.forEach((c,i) => {
-      RawRn[i] = c;
+      if(i%4 == 0) RawRn[i/4] = c;
     });
-    netRadiationRn = tf.tensor(RawRn,[imgW,imgH]);
+    netRadiationRn = mapTensor(tf.tensor(RawRn,[imgW,imgH]),0,255,500,700);
     RawRn = null;
 
     let RawSoilFlux = [];
     soilFluxImageG.loadPixels();
     soilFluxImageG.pixels.forEach((c,i) => {
-      RawSoilFlux[i] = c;
+      if(i%4 == 0) RawSoilFlux[i/4] = c;
     });
-    soilMoistureFluxG = tf.tensor(RawSoilFlux,[imgW,imgH]);
+    soilMoistureFluxG = mapTensor(tf.tensor(RawSoilFlux,[imgW,imgH]),0,255,50,175);
     RawSoilFlux = null;
 
     let RawSensibleHeatFlux = [];
     sensibleHeatFluxImage.loadPixels();
     sensibleHeatFluxImage.pixels.forEach((c,i) => {
-      RawSensibleHeatFlux[i] = c;
+      if(i%4 == 0) RawSensibleHeatFlux[i/4] = c;
     });
-    sensibleHeatFluxH = tf.tensor(RawSensibleHeatFlux,[imgW,imgH]);
+    sensibleHeatFluxH = mapTensor(tf.tensor(RawSensibleHeatFlux,[imgW,imgH]),0,255,0,500);
     RawSensibleHeatFlux = null;
   // --------------
   // --- Processing ---
+  const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
+  console.log("--Latent Heat Flux Lambda:");
+  console.log(latentHeatFluxLambda.dataSync()[2165+919*imgW]);
 
+  const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH)); // Whatever chevron is
+  console.log("--Hendrick's Ratio (Chevron):");
+  console.log(hendricksRatioChevron1.dataSync()[2165+919*imgW]);
 
+  tf.dispose([sensibleHeatFluxH,latentHeatFluxLambda,netRadiationRn,soilMoistureFluxG]);
 
+  const soilSaturation = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
+  console.log("--Soil Saturation (S):");
+  console.log(soilSaturation.dataSync()[2165+919*imgW]);
+
+  tf.dispose(hendricksRatioChevron1);
 
   // ------------------
-
   // --- Outputs ---
+    let RawSoilSat = mapTensor(soilSaturation,0,1,0,255).toInt().dataSync();
+    tf.dispose([soilSaturation]);
 
+    soilSaturationImage = makeImage(imgW,imgH,RawSoilSat);
+    RawSoilSat = null;
+
+    addImages([soilSaturationImage]);
+
+    soilSaturationImage.save(soilSaturationFilename);
   // ---------------
   };
-     //const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
-
-     //console.log("Acquired: Ground Roughness (Rah), Sensible Heat Flux (H), and Latent Heat Flux (&#x3BB;).\nNow working on Hendrick's Ratio (v1, &#94;), and Soil Saturation.");
-
-     //const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH)); // Whatever chevron is
-
-    //tf.dispose([sensibleHeatFluxH,latentHeatFluxLambda]);
-
-     //const soilSaturation1 = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
-
-    //tf.dispose(hendricksRatioChevron1);
-
-    // --- Create the p5 image ---
-    //let RawNIR = ndvi.mul(255).toInt().dataSync();
-
-    //let RawLAI = lai.mul(255).toInt().dataSync();
-    //let RawEmiss = emissivity.mul(255).toInt().dataSync();
-
-    //let RawSoil1 = soilSaturation1.mul(255).toInt().dataSync();
-
-    //tf.dispose([nirTensor,thermalTensor,ndvi,soilSaturation1,netRadiationRn,soilMoistureFluxG]);
-
-    //nirImage = makeImage(imgW,imgH,RawNIR);
-    //laiImage = makeImage(imgW,imgH,RawLAI);
-    //emissImage = makeImage(imgW,imgH,RawEmiss);
-
-    //soilImage = makeImage(imgW,imgH,RawSoil1);
-
-
-    //RawNIR = null;
-    //RawNDVI = null;
-    //RawRn = null;
-    //RawSoilFlux = null;
-    //RawSoil1 = null;
-    //nirImage = null;
-    //ndviImage = null;
-    //nirReds = null;
-    //nirNIR = null;
-    //thermalTs = null;
-    //albedoImg = null;
-
-     //console.log("Images Calculated and Saved Successfully!");
   });
   frameRate(1);
 }
