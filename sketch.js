@@ -122,9 +122,9 @@ const appendImageArr = (id,name,good,crit = false) => {
   }
 };
 // --- Draws the collected images onto the canvas consecutively ---
-const drawNextImage = frame => image(imageArray[(frame%imageArray.length) - 1],0,0);
+const drawNextImage = frame => image(imageArray[frame%imageArray.length],0,0,(imgH>=imgW)?(imgW*windowHeight)/imgH:windowWidth,(imgH<=imgW)?(imgH*windowWidth)/imgW:windowHeight);
 // --- Collects the created images into an array for display ---
-const addImages = (...imgs) => imgs.forEach(c => imageArray.push(c));
+const addImages = imgs => imgs.forEach(c => imageArray.push(c));
 // --- Checker than ensures that the image being called has been imported ---
 const checkRequirements = range => {
   let tempCheck = true;
@@ -155,10 +155,10 @@ Date.prototype.getDOY = function() {
 function preload(){
   nearInfared = loadImage(compositeImageFilename, () => appendImageArr(0,"Composite Image",true), () => appendImageArr(0,"Composite Image",false,true));
   rgb = loadImage(rgbImageFilename, () => appendImageArr(1,"RGB Image",true), () => appendImageArr(1,"RGB Image",false,true));
-  netRadiationImageRn = loadImage(netRadiationImageFilename, () => appendImageArr(2,"Net Radiation Image",true), () => appendImageArr(2,"Net Radiation Image",false,false));
-  soilFluxImageG = loadImage(soilFluxImageFilename, () => appendImageArr(3,"Soil Flux Image",true), () => appendImageArr(3,"Soil Flux Image",false,false));
-  thermalImageImp = loadImage(thermalImageFilename, () => appendImageArr(4,"Thermal Image",true), () => appendImageArr(4,"Thermal Image",false,false));
-  sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
+  //netRadiationImageRn = loadImage(netRadiationImageFilename, () => appendImageArr(2,"Net Radiation Image",true), () => appendImageArr(2,"Net Radiation Image",false,false));
+  //soilFluxImageG = loadImage(soilFluxImageFilename, () => appendImageArr(3,"Soil Flux Image",true), () => appendImageArr(3,"Soil Flux Image",false,false));
+  //thermalImageImp = loadImage(thermalImageFilename, () => appendImageArr(4,"Thermal Image",true), () => appendImageArr(4,"Thermal Image",false,false));
+  //sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
 }
 
 // --- p5 Initialization ---
@@ -173,7 +173,7 @@ function setup() {
     imgH = imageDimensions[1];
   }
 
-  createCanvas(500,636);
+  createCanvas(windowWidth,windowHeight);
 
   // --- TensorFlow Garbage Collect ---
   tf.tidy(() => {
@@ -284,21 +284,25 @@ function setup() {
         tf.dispose([emissivity,albedo,outgoingLongwave]);
     // ------------------------------------
     // --- Outputs ---
-    let RawRn = mapTensor(netRadiationRn,500,700,0,255).toInt().dataSync();
+    //let RawRn = mapTensor(netRadiationRn,500,700,0,255).toInt().dataSync();
     let RawSoilFlux = mapTensor(soilMoistureFluxG,50,175,0,255).toInt().dataSync();
     let RawThermal = mapTensor(thermalTensor,thermalMapping[0],thermalMapping[1],0,255).toInt().dataSync();
 
     tf.dispose([netRadiationRn,soilMoistureFluxG,thermalTensor]);
 
-    rnImage = makeImage(imgW,imgH,RawRn);
+    //rnImage = makeImage(imgW,imgH,RawRn);
     soilFluxImage = makeImage(imgW,imgH,RawSoilFlux);
     thermalImage = makeImage(imgW,imgH,RawThermal);
 
-    addImages([rnImage,soilFluxImage,thermalImage]);
+    //RawRn = null;
+    RawSoilFlux = null;
+    RawThermal = null;
 
-    rnImage.save(netRadiationImageFilename);
-    soilFluxImage.save(soilFluxImageFilename);
-    thermalImage.save(thermalImageFilename);
+    addImages([rgb,soilFluxImage,thermalImage]);
+
+    //rnImage.save(netRadiationImageFilename);
+    //soilFluxImage.save(soilFluxImageFilename);
+    //thermalImage.save(thermalImageFilename);
     // ---------------
   // - If the Rn, G, and Thermal images are provided, then continue (requires a restart for RAM considerations) -
 }else if(checkRequirements([0,4]) && !checkRequirements([4,5])){
@@ -407,7 +411,7 @@ function setup() {
     sensHeatFlux = makeImage(imgW,imgH,RawSensibleHeatFlux);
     addImages([sensHeatFlux]);
 
-    sensHeatFlux.save(sensHeatFluxFilename);
+    //sensHeatFlux.save(sensHeatFluxFilename);
   // ---------------
 
 }else if(checkRequirements([0,5])){
@@ -463,7 +467,7 @@ function setup() {
 
     addImages([soilSaturationImage]);
 
-    soilSaturationImage.save(soilSaturationFilename);
+    //soilSaturationImage.save(soilSaturationFilename);
   // ---------------
   };
   });
