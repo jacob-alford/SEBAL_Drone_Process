@@ -1,4 +1,4 @@
-# SEBAL_Drone_PROCESS
+# SEBAL_Drone_Process
 Processes drone images using the SEBAL algorithm to calculate soil saturation.
 
 ## Inputs
