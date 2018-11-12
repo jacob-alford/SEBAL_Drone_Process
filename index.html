@@ -1,28 +1,170 @@
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script type="text/javascript" src="http://latex.codecogs.com/latexit.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <title>SEBAL_Drone_Process</title>
+  </head>
+  <body>
 
-	<title>SEBEL_IMAGE_PROCESS</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/p5.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/addons/p5.dom.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/addons/p5.sound.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.13.0"> </script>
-  <script src="sketch.js"></script>
+    <div class="jumbotron mx-auto text-center bg-dark">
+      <h1 class="display-1" style="color:white">SEBAL_Drone_Process</h1>
+    </div>
 
-	<style>
-		body {
-			margin:0;
-			padding:0;
-			overflow: hidden;
-		}
-		canvas {
-			margin:auto;
-		}
-	</style>
-</head>
-<body>
-</body>
+    <div class="container">
+      <h1><strong>General Information</strong></h1>
+      <p> This program does...</p>
+    </div>
+
+    <div class="container mx-auto mt-4">
+      <div class="row">
+        <div class="col">
+          <h3 class="display-5 text-center">Edit your configuration</h3>
+          <p>
+          <button type="button" id="configButton" style="color:black;font-size:1.5em;" class="btn btn-large btn-info my-3 btn-block font-weight-bold">Config</button>
+          <div class="alert alert-warning alert-dismissible fade show">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <strong>Note:</strong> configuration stores its data in cookies!
+          </div>
+        </div>
+        <div class="col">
+          <h3 class="display-5 text-center">Run script</h3>
+          <button type="button" style="color:black;font-size:1.5em;" class="btn btn-large btn-success my-3 btn-block font-weight-bold">Run</button>
+          <div class="alert alert-danger alert-dismissible fade show">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <strong>Warning:</strong> Uses <em>a lot</em> of memory. <a href="#memWarning" class="alert-link">Click here for more details.</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="RGBoutput2.jpg">
+            <div class="card-body">
+              <h3 class="card-title">RGB Input Image</h3>
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Spectrum Band</th>
+                    <th>Image Channel</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Red</td>
+                    <td>Red</td>
+                  </tr>
+                  <tr>
+                    <td>Blue</td>
+                    <td>Blue</td>
+                  </tr>
+                  <tr>
+                    <td>Green</td>
+                    <td>Green</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="composite2.jpg">
+            <div class="card-body">
+              <h3 class="card-title">Composite Input Image</h3>
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Spectrum Band</th>
+                    <th>Image Channel</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Red</td>
+                    <td>Red</td>
+                  </tr>
+                  <tr>
+                    <td>Thermal</td>
+                    <td>Blue</td>
+                  </tr>
+                  <tr>
+                    <td>Near Infared</td>
+                    <td>Green</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row mt-5">
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="RnImage.jpg">
+            <div class="card-body">
+              <h3 class="card-title"> <span lang="latex">(Rn)</span> Net Radiation</h3>
+              <p class="card-text">Net Radiation is the ... </p>
+              <p class="card-text" lang="latex">e=mc^2</p>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="SoilFlux.jpg">
+            <div class="card-body">
+              <div class="card-body">
+                <h3 class="card-title"> <span lang="latex">(G)</span> Soil Flux</h3>
+                <p class="card-text">Soil Flux is the ... </p>
+                <p class="card-text" lang="latex">e=mc^2</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="thermalImg.jpg">
+            <div class="card-body">
+              <h3 class="card-title"> <span lang="latex">(T)</span> Thermal Band</h3>
+              <p class="card-text">The is the thermal image extracted from the composite image.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row mt-5">
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="sensHeatFlux.jpg">
+            <div class="card-body">
+              <h3 class="card-title"> <span lang="latex">(Rn)</span> Sensible Heat Flux</h3>
+              <p class="card-text">Sensible Heat Flux is the ... </p>
+              <p class="card-text" lang="latex">e=mc^2</p>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card mx-auto">
+            <img class="card-img-top" src="soilSat.jpg">
+            <div class="card-body">
+              <div class="card-body">
+                <h3 class="card-title"> <span lang="latex">(G)</span> Soil Saturation</h3>
+                <p class="card-text">At long last, Soil Flux is the ... </p>
+                <p class="card-text" lang="latex">e=mc^2</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="javascripto.js"></script>
+  </body>
 </html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script type="text/javascript" src="http://latex.codecogs.com/latexit.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <title>SEBAL_Drone_Process</title>
+  </head>
+  <body>
+
+    <div class="jumbotron mx-auto text-center bg-dark">
+      <h1 class="display-1" style="color:white">SEBAL_Drone_Process</h1>
+    </div>
+
+    <div class="container">
+      <h5><a href="../">&larr; back</a></h5>
+    </div>
+
+    <div class="container">
+      <h1><strong>Configuration Settings</strong></h1>
+      <p>Update the constants and other values used by the program.</p>
+    </div>
+
+    <div class="container">
+      <h3 class="mb-3">Miscellaneous Constants</h3>
+      <form id="configForm">
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label for="gHeight">Height of the 'Ground' <span lang="latex">(m)</span></label>
+              <input type="number" name="gHeight" class="form-control" id="gHeight" value=".1">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="aHeight">Height of the 'Air' <span lang="latex">(m)</span></label>
+              <input type="number" name="aHeight" class="form-control" id="aHeight" value="200">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="sHeight">Height of the Wind Sensor <span lang="latex">(m)</span></label>
+              <input type="number" name="sHeight" class="form-control" id="sHeight" value="2">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label for="pHeight">Average plant height <span lang="latex">(m)</span></label>
+              <input type="number" name="pHeight" class="form-control" id="pHeight" value="2">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="wSpeed">Average Wind Speed <span lang="latex">(m/s)</span></label>
+              <input type="number" name="wSpeed" class="form-control" id="wSpeed" value="3.6">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="aDensity">Average Air Density <span lang="latex">(\frac{kg}{m^3})</span></label>
+              <input type="number" name="aDensity" class="form-control" id="aDensity" value=".08163">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label for="tempMin">Thermal Exposure Temperature Minimum <span lang="latex">(K)</span></label>
+              <input type="number" name="tempMin" class="form-control" id="tempMin" value="299.1">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="tempMax">Thermal Exposure Temperature Maximum <span lang="latex">(K)</span></label>
+              <input type="number" name="tempMax" class="form-control" id="tempMax" value="315.1">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="cosZen">Cosine of the Zenith Angle at Time of Capture</label>
+              <input type="number" name="cosZen" class="form-control" id="cosZen" value=".4337">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
+              <label for="imgWidth">Image Width <span lang="latex">(pixels)</span></label>
+              <input type="number" name="imgWidth" class="form-control" id="imgWidth" value="3539">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="imgHeight">Image Height <span lang="latex">(pixels)</span></label>
+              <input type="number" name="imgHeight" class="form-control" id="imgHeight" value="4165">
+            </div>
+          </div>
+          <div class="col">
+            <div class="form-group">
+              <label for="airTemp">Air Temperature <span lang="latex">(K)</span></label>
+              <input type="number" name="airTemp" class="form-control" id="airTemp" value="294.25">
+            </div>
+          </div>
+        </div>
+        <input type="submit" class="btn btn-primary" id="submitConfigBtn">
+      </form>
+      <div class="alert alert-success my-4" id="successBox">
+        Updated configuration successfully!
+      </div>
+      <div class="alert alert-danger my-4" id="failBox">
+        Unable to set configuration, cookies are disabled!
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="javascripto.js"></script>
+  </body>
+</html>
