@@ -15,15 +15,14 @@
 
     <div class="container">
       <h1><strong>General Information</strong></h1>
-      <p> This program does...</p>
+      <p>This project endeavors to describe the moisture content of soil remotely with drone technology.  By combining thermal, rgb, and near infared captures with the SEBAL algorithm this program calculates the relative subsurface water content of a captured area.</p>
     </div>
 
     <div class="container mx-auto mt-4">
       <div class="row">
         <div class="col">
           <h3 class="display-5 text-center">Edit your configuration</h3>
-          <p>
-          <button type="button" id="configButton" style="color:black;font-size:1.5em;" class="btn btn-large btn-info my-3 btn-block font-weight-bold">Config</button>
+          <button type="button" id="configButton" style="color:black;font-size:1.5em;" class="btn btn-large btn-info my-3 btn-block font-weight-bold">Configuration</button>
           <div class="alert alert-warning alert-dismissible fade show">
             <button type="button" class="close" data-dismiss="alert">&times;</button>
             <strong>Note:</strong> configuration stores its data in cookies!
@@ -31,7 +30,7 @@
         </div>
         <div class="col">
           <h3 class="display-5 text-center">Run script</h3>
-          <button type="button" style="color:black;font-size:1.5em;" class="btn btn-large btn-success my-3 btn-block font-weight-bold">Run</button>
+          <button type="button" style="color:black;font-size:1.5em;" class="btn btn-large btn-success my-3 btn-block font-weight-bold">Run Program</button>
           <div class="alert alert-danger alert-dismissible fade show">
             <button type="button" class="close" data-dismiss="alert">&times;</button>
             <strong>Warning:</strong> Uses <em>a lot</em> of memory. <a href="#memWarning" class="alert-link">Click here for more details.</a>
@@ -109,8 +108,8 @@
             <img class="card-img-top" src="RnImage.jpg">
             <div class="card-body">
               <h3 class="card-title"> <span lang="latex">(Rn)</span> Net Radiation</h3>
-              <p class="card-text">Net Radiation is the ... </p>
-              <p class="card-text" lang="latex">e=mc^2</p>
+              <p class="card-text">Net Radiation is difference between incoming solar radiation and outgoing solar radiation; and accounts for various other factors like surface emissivity.</p>
+              <p class="card-text" lang="latex"></p>
             </div>
           </div>
         </div>
@@ -120,7 +119,7 @@
             <div class="card-body">
               <div class="card-body">
                 <h3 class="card-title"> <span lang="latex">(G)</span> Soil Flux</h3>
-                <p class="card-text">Soil Flux is the ... </p>
+                <p class="card-text">Soil Flux represents the relative energy lost to the soil.</p>
                 <p class="card-text" lang="latex">e=mc^2</p>
               </div>
             </div>
@@ -141,8 +140,8 @@
           <div class="card mx-auto">
             <img class="card-img-top" src="sensHeatFlux.jpg">
             <div class="card-body">
-              <h3 class="card-title"> <span lang="latex">(Rn)</span> Sensible Heat Flux</h3>
-              <p class="card-text">Sensible Heat Flux is the ... </p>
+              <h3 class="card-title"> <span lang="latex">(H)</span> Sensible Heat Flux</h3>
+              <p class="card-text">Sensible Heat Flux is remaining energy after other variables have been accounted for.</p>
               <p class="card-text" lang="latex">e=mc^2</p>
             </div>
           </div>
@@ -152,8 +151,8 @@
             <img class="card-img-top" src="soilSat.jpg">
             <div class="card-body">
               <div class="card-body">
-                <h3 class="card-title"> <span lang="latex">(G)</span> Soil Saturation</h3>
-                <p class="card-text">At long last, Soil Flux is the ... </p>
+                <h3 class="card-title"> <span lang="latex">(S)</span> Soil Saturation</h3>
+                <p class="card-text">Soil saturation is the calculated moisture content of the soil from zero to root-depth.</p>
                 <p class="card-text" lang="latex">e=mc^2</p>
               </div>
             </div>

@@ -23,7 +23,7 @@
     </div>
 
     <div class="container">
-      <h3 class="mb-3">Miscellaneous Constants</h3>
+      <h3 class="mb-3">Vertical Dimensions</h3>
       <form id="configForm">
         <div class="row">
           <div class="col">
@@ -52,19 +52,25 @@
               <input type="number" name="pHeight" class="form-control" id="pHeight" value="2">
             </div>
           </div>
+        </div>
+        <h3 class="mb-3">Air Parameters</h3>
+        <div class="row">
           <div class="col">
             <div class="form-group">
               <label for="wSpeed">Average Wind Speed <span lang="latex">(m/s)</span></label>
               <input type="number" name="wSpeed" class="form-control" id="wSpeed" value="3.6">
             </div>
           </div>
+        </div>
+        <div class="row">
           <div class="col">
             <div class="form-group">
-              <label for="aDensity">Average Air Density <span lang="latex">(\frac{kg}{m^3})</span></label>
+              <label for="aDensity">Average Air Density <span lang="latex">\left(\frac{kg}{m^3}\right)</span></label>
               <input type="number" name="aDensity" class="form-control" id="aDensity" value=".08163">
             </div>
           </div>
         </div>
+        <h3 class="mb-3">Temperature and the Sun</h3>
         <div class="row">
           <div class="col">
             <div class="form-group">
@@ -80,11 +86,20 @@
           </div>
           <div class="col">
             <div class="form-group">
+              <label for="airTemp">Air Temperature <span lang="latex">(K)</span></label>
+              <input type="number" name="airTemp" class="form-control" id="airTemp" value="294.25">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="form-group">
               <label for="cosZen">Cosine of the Zenith Angle at Time of Capture</label>
               <input type="number" name="cosZen" class="form-control" id="cosZen" value=".4337">
             </div>
           </div>
         </div>
+        <h3 class="mb-3">Image Size Fallback</h3>
         <div class="row">
           <div class="col">
             <div class="form-group">
@@ -98,14 +113,8 @@
               <input type="number" name="imgHeight" class="form-control" id="imgHeight" value="4165">
             </div>
           </div>
-          <div class="col">
-            <div class="form-group">
-              <label for="airTemp">Air Temperature <span lang="latex">(K)</span></label>
-              <input type="number" name="airTemp" class="form-control" id="airTemp" value="294.25">
-            </div>
-          </div>
         </div>
-        <input type="submit" class="btn btn-primary" id="submitConfigBtn">
+        <input type="submit" class="btn btn-primary" id="submitConfigBtn" value="Set Configuration">
       </form>
       <div class="alert alert-success my-4" id="successBox">
         Updated configuration successfully!
