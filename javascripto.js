@@ -9,6 +9,7 @@ const bakeCookie = (...args) => {
 }
 
 $(document).ready(function(){
+  $('[data-toggle="tooltip"]').tooltip(); 
   $("#configButton").click(() => {
     document.cookie = bakeCookie({name:"cookiesAreEnabled",value:"Yes"});
     window.location.href="config";
