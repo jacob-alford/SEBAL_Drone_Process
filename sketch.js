@@ -4,20 +4,25 @@ const sigma = 5.67 * Math.pow(10,-8); // Boltzman Constant
 const perihelion = 2; //The day in January of the perihelion, used for distance calculation
 const ast_a = 1.496 * Math.pow(10,11); //Earth's semi-major axis
 const ast_e = .0167; //Earth's eccentricity
-const airTemp = 294.25; // Air temperature at the time of capture
+const airTemp = 288.1; // Air temperature at the time of capture
 const heightGround = .1; //m
 const heightAir = 200; //m
-const windSpeed = 3.6; //m/s
+const windSpeed = 2.7; //m/s
 const heightWindSensor = 2; //m
 const plantHeightAvg = 2; //m
-const airDensity = .08163; //kg/m^3
-const zenithAngle = .4337;
-const thermalMapping = [299.1,315.1];
-const imageDimensions = [3539,4165];
+const airDensity = 1.019; //kg/m^3
+const zenithAngle = .548;
+const thermalMapping = [273.2,321.2];
+const imageDimensions = [3445,2566];
+// --- Necessary for importing sensible heat flux ---
+const rnDims = [-190.166885,657.029785];
+const soilFluxDims = [-41.936,96.4256896];
+const heatFluxDims = [-1836.78369,5992.441]; // Goes into here
+const nStDevMap = [2,2];
 
 // --- Image filenames ---
-let rgbImageFilename = 'RGBoutput2.jpg';
-let compositeImageFilename = 'composite2.jpg';
+let rgbImageFilename = 'RGB.jpg';
+let compositeImageFilename = 'composite.jpg';
 let netRadiationImageFilename = 'RnImage.jpg';
 let soilFluxImageFilename = 'SoilFlux.jpg';
 let thermalImageFilename = 'thermalImg.jpg';
@@ -109,6 +114,8 @@ const makeImage = (w,h,pixArr) => {
 }
 // --- Maps a tensor from range [oldMin,oldMax] to new range [newMin,newMax] ---
 const mapTensor = (tensor,oldMin,oldMax,newMin,newMax) => tensor.sub(oldMin).mul(newMax-newMin).div(oldMax-oldMin).add(newMin);
+// --- Gets the standard deviation of a tensor ---
+const stDevTensor = tensor => tensor.pow(2).mean().sub(tensor.mean().pow(2)).sqrt();
 // --- Collects imported images for validation ---
 const appendImageArr = (id,name,good,crit = false) => {
   imageImportArray[id] = ({name:name,success:good});
@@ -155,15 +162,15 @@ Date.prototype.getDOY = function() {
 function preload(){
   nearInfared = loadImage(compositeImageFilename, () => appendImageArr(0,"Composite Image",true), () => appendImageArr(0,"Composite Image",false,true));
   rgb = loadImage(rgbImageFilename, () => appendImageArr(1,"RGB Image",true), () => appendImageArr(1,"RGB Image",false,true));
-  //netRadiationImageRn = loadImage(netRadiationImageFilename, () => appendImageArr(2,"Net Radiation Image",true), () => appendImageArr(2,"Net Radiation Image",false,false));
-  //soilFluxImageG = loadImage(soilFluxImageFilename, () => appendImageArr(3,"Soil Flux Image",true), () => appendImageArr(3,"Soil Flux Image",false,false));
-  //thermalImageImp = loadImage(thermalImageFilename, () => appendImageArr(4,"Thermal Image",true), () => appendImageArr(4,"Thermal Image",false,false));
-  //sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
+  netRadiationImageRn = loadImage(netRadiationImageFilename, () => appendImageArr(2,"Net Radiation Image",true), () => appendImageArr(2,"Net Radiation Image",false,false));
+  soilFluxImageG = loadImage(soilFluxImageFilename, () => appendImageArr(3,"Soil Flux Image",true), () => appendImageArr(3,"Soil Flux Image",false,false));
+  thermalImageImp = loadImage(thermalImageFilename, () => appendImageArr(4,"Thermal Image",true), () => appendImageArr(4,"Thermal Image",false,false));
+  sensibleHeatFluxImage = loadImage(sensHeatFluxFilename, () => appendImageArr(5,"Sensible Heat Flux",true), () => appendImageArr(4,"Sensible Heat Flux",false,false));
 }
 
 // --- p5 Initialization ---
 function setup() {
-  tedData = new GeoData(new Date('October 10, 2018'));
+  tedData = new GeoData(new Date('November 28, 2018'));
 
   if(!(nearInfared === undefined)){
     imgW = nearInfared.width;
@@ -284,25 +291,33 @@ function setup() {
         tf.dispose([emissivity,albedo,outgoingLongwave]);
     // ------------------------------------
     // --- Outputs ---
-    //let RawRn = mapTensor(netRadiationRn,500,700,0,255).toInt().dataSync();
-    let RawSoilFlux = mapTensor(soilMoistureFluxG,50,175,0,255).toInt().dataSync();
+    let soilFluxMean = soilMoistureFluxG.mean();
+    let soilFluxSt = stDevTensor(soilMoistureFluxG);
+    let rnMean = netRadiationRn.mean();
+    let rnSt = stDevTensor(netRadiationRn);
+    alert(`
+      Soil Flux Range: (${soilFluxMean.sub(soilFluxSt.mul(nStDevMap[0])).dataSync()},${soilFluxMean.add(soilFluxSt.mul(nStDevMap[1])).dataSync()})\n
+      RN Range: (${rnMean.sub(rnSt.mul(nStDevMap[0])).dataSync()},${rnMean.add(rnSt.mul(nStDevMap[1])).dataSync()})
+      `);
+    let RawRn = mapTensor(netRadiationRn,rnMean.sub(rnSt.mul(nStDevMap[0])).dataSync(),rnMean.add(rnSt.mul(nStDevMap[1])).dataSync(),0,255).toInt().dataSync();
+    let RawSoilFlux = mapTensor(soilMoistureFluxG,soilFluxMean.sub(soilFluxSt.mul(nStDevMap[0])).dataSync(),soilFluxMean.add(soilFluxSt.mul(nStDevMap[1])).dataSync(),0,255).toInt().dataSync();
     let RawThermal = mapTensor(thermalTensor,thermalMapping[0],thermalMapping[1],0,255).toInt().dataSync();
 
     tf.dispose([netRadiationRn,soilMoistureFluxG,thermalTensor]);
 
-    //rnImage = makeImage(imgW,imgH,RawRn);
+    rnImage = makeImage(imgW,imgH,RawRn);
     soilFluxImage = makeImage(imgW,imgH,RawSoilFlux);
     thermalImage = makeImage(imgW,imgH,RawThermal);
 
-    //RawRn = null;
+    RawRn = null;
     RawSoilFlux = null;
     RawThermal = null;
 
     addImages([rgb,soilFluxImage,thermalImage]);
 
-    //rnImage.save(netRadiationImageFilename);
-    //soilFluxImage.save(soilFluxImageFilename);
-    //thermalImage.save(thermalImageFilename);
+    rnImage.save(netRadiationImageFilename);
+    soilFluxImage.save(soilFluxImageFilename);
+    thermalImage.save(thermalImageFilename);
     // ---------------
   // - If the Rn, G, and Thermal images are provided, then continue (requires a restart for RAM considerations) -
 }else if(checkRequirements([0,4]) && !checkRequirements([4,5])){
@@ -340,7 +355,7 @@ function setup() {
 
     console.log("Starting loop...");
 
-    for(let c=0;c<2;c++){
+    for(let c=0;c<3;c++){
       console.log(`Pass number: ${c}`);
 
        sensibleHeatFluxH = thermalTensor.sub(tedData.temperature).mul(airDensity).mul(1004).div(groundRoughnessRah); // Sensible Heat Flux
@@ -405,13 +420,18 @@ function setup() {
   console.log(sensibleHeatFluxH.dataSync()[2165+919*imgW]);
   // ------------------
   // --- Outputs ---
-    let RawSensibleHeatFlux = mapTensor(sensibleHeatFluxH,0,500,0,255).toInt().dataSync();
+    let sensHeatMean = sensibleHeatFluxH.mean();
+    sensHeatMean.print();
+    let sensHeatStDev = stDevTensor(sensibleHeatFluxH);
+    sensHeatStDev.print();
+    alert(`glb: ${sensHeatMean.sub(sensHeatStDev.mul(nStDevMap[0])).dataSync()}, lub: ${sensHeatMean.add(sensHeatStDev.mul(nStDevMap[1])).dataSync()}`);
+    let RawSensibleHeatFlux = mapTensor(sensibleHeatFluxH,sensHeatMean.sub(sensHeatStDev.mul(nStDevMap[0])).dataSync(),sensHeatMean.add(sensHeatStDev.mul(nStDevMap[1])).dataSync(),0,255).toInt().dataSync();
     tf.dispose([thermalTensor,sensibleHeatFluxH,moninObukhovLengthL,psiHs,psiM,psiHg]);
 
     sensHeatFlux = makeImage(imgW,imgH,RawSensibleHeatFlux);
     addImages([sensHeatFlux]);
 
-    //sensHeatFlux.save(sensHeatFluxFilename);
+    sensHeatFlux.save(sensHeatFluxFilename);
   // ---------------
 
 }else if(checkRequirements([0,5])){
@@ -421,7 +441,7 @@ function setup() {
     netRadiationImageRn.pixels.forEach((c,i) => {
       if(i%4 == 0) RawRn[i/4] = c;
     });
-    netRadiationRn = mapTensor(tf.tensor(RawRn,[imgW,imgH]),0,255,500,700);
+    netRadiationRn = mapTensor(tf.tensor(RawRn,[imgW,imgH]),0,255,rnDims[0],rnDims[1]);
     RawRn = null;
 
     let RawSoilFlux = [];
@@ -429,7 +449,7 @@ function setup() {
     soilFluxImageG.pixels.forEach((c,i) => {
       if(i%4 == 0) RawSoilFlux[i/4] = c;
     });
-    soilMoistureFluxG = mapTensor(tf.tensor(RawSoilFlux,[imgW,imgH]),0,255,50,175);
+    soilMoistureFluxG = mapTensor(tf.tensor(RawSoilFlux,[imgW,imgH]),0,255,soilFluxDims[0],soilFluxDims[1]);
     RawSoilFlux = null;
 
     let RawSensibleHeatFlux = [];
@@ -437,29 +457,38 @@ function setup() {
     sensibleHeatFluxImage.pixels.forEach((c,i) => {
       if(i%4 == 0) RawSensibleHeatFlux[i/4] = c;
     });
-    sensibleHeatFluxH = mapTensor(tf.tensor(RawSensibleHeatFlux,[imgW,imgH]),0,255,0,500);
+    sensibleHeatFluxH = mapTensor(tf.tensor(RawSensibleHeatFlux,[imgW,imgH]),0,255,heatFluxDims[0],heatFluxDims[1]);
     RawSensibleHeatFlux = null;
   // --------------
   // --- Processing ---
   const latentHeatFluxLambda = netRadiationRn.sub(soilMoistureFluxG).sub(sensibleHeatFluxH); // Latent Heat Flux
-  console.log("--Latent Heat Flux Lambda:");
-  console.log(latentHeatFluxLambda.dataSync()[2165+919*imgW]);
+    console.log("--Latent Heat Flux Lambda:");
+    console.log(latentHeatFluxLambda.dataSync()[2165+919*imgW]);
 
-  const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH)); // Whatever chevron is
-  console.log("--Hendrick's Ratio (Chevron):");
-  console.log(hendricksRatioChevron1.dataSync()[2165+919*imgW]);
+  const hendricksRatioChevron1 = latentHeatFluxLambda.div(latentHeatFluxLambda.add(sensibleHeatFluxH.add(.00000000000000001))); // Whatever chevron is
+    console.log("--Hendrick's Ratio (Chevron):");
+    console.log(hendricksRatioChevron1.dataSync()[2165+919*imgW]);
+    hendricksRatioChevron1.min().print();
+    hendricksRatioChevron1.max().print();
+    hendricksRatioChevron1.mean().print();
 
   tf.dispose([sensibleHeatFluxH,latentHeatFluxLambda,netRadiationRn,soilMoistureFluxG]);
 
-  const soilSaturation = tf.exp(hendricksRatioChevron1.sub(1).div(.42)); // Soil Saturation
-  console.log("--Soil Saturation (S):");
-  console.log(soilSaturation.dataSync()[2165+919*imgW]);
+  const soilSaturation = tf.exp(hendricksRatioChevron1.sub(1).div(.42)).clipByValue(0,700); // Soil Saturation
+    soilSaturation.min().print();
+    soilSaturation.max().print();
+    soilSaturation.mean().print();
+    console.log("--Soil Saturation (S):");
+    console.log(soilSaturation.dataSync()[2165+919*imgW]);
 
   tf.dispose(hendricksRatioChevron1);
 
   // ------------------
   // --- Outputs ---
-    let RawSoilSat = mapTensor(soilSaturation,0,1,0,255).toInt().dataSync();
+  let soilSatMean = soilSaturation.mean();
+  let soilSatStDev = stDevTensor(soilSaturation);
+  alert(`Mean: ${soilSatMean}, St.Dev: ${soilSatStDev}`);
+    let RawSoilSat = mapTensor(soilSaturation,soilSatMean.sub(soilSatStDev.mul(nStDevMap[0])).dataSync(),soilSatMean.add(soilSatStDev.mul(nStDevMap[1])).dataSync(),0,255).toInt().dataSync();
     tf.dispose([soilSaturation]);
 
     soilSaturationImage = makeImage(imgW,imgH,RawSoilSat);
@@ -467,7 +496,7 @@ function setup() {
 
     addImages([soilSaturationImage]);
 
-    //soilSaturationImage.save(soilSaturationFilename);
+    soilSaturationImage.save(soilSaturationFilename);
   // ---------------
   };
   });
