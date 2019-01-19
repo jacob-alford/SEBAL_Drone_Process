@@ -15,7 +15,7 @@ This program uses the latest ECMAScript standard, Tensorflow.js, and p5.js while
 
 ### Sample Inputs
 #### RGB Image:
-![RGB Image](RGBoutput2.jpg)
+![RGB Image](RGB.jpg)
 #### Composite Image:
 ![Composite Image](composite2.jpg)
 
